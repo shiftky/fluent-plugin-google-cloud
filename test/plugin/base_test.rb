@@ -151,7 +151,9 @@ module BaseTest
       CONFIG_EC2_PROJECT_ID =>
         ['ec2', EC2_PROJECT_ID, EC2_PREFIXED_ZONE, EC2_VM_ID],
       CONFIG_EC2_PROJECT_ID_AND_CUSTOM_VM_ID =>
-        ['ec2', EC2_PROJECT_ID, EC2_PREFIXED_ZONE, CUSTOM_VM_ID]
+        ['ec2', EC2_PROJECT_ID, EC2_PREFIXED_ZONE, CUSTOM_VM_ID],
+      CONFIG_OPENSTACK_PROJECT_ID =>
+        ['openstack', OPENSTACK_PROJECT_ID, OPENSTACK_ZONE, OPENSTACK_VM_ID]
     }.each_with_index do |(config, parts), index|
       send("setup_#{parts[0]}_metadata_stubs")
       d = create_driver(config)
@@ -178,6 +180,30 @@ module BaseTest
 
   def test_ec2_metadata_project_id_from_credentials
     setup_ec2_metadata_stubs
+    [IAM_CREDENTIALS, LEGACY_CREDENTIALS].each do |creds|
+      ENV['GOOGLE_APPLICATION_CREDENTIALS'] = creds[:path]
+      d = create_driver
+      d.run
+      assert_equal creds[:project_id], d.instance.project_id
+    end
+  end
+
+  def test_openstack_metadata_requires_project_id
+    setup_openstack_metadata_stubs
+    exception_count = 0
+    Fluent::GoogleCloudOutput::CredentialsInfo.stubs(:project_id).returns(nil)
+    begin
+      create_driver
+    rescue Fluent::ConfigError => error
+      assert error.message.include? 'Unable to obtain metadata parameters:'
+      assert error.message.include? 'project_id'
+      exception_count += 1
+    end
+    assert_equal 1, exception_count
+  end
+
+  def test_openstack_metadata_project_id_from_credentials
+    setup_openstack_metadata_stubs
     [IAM_CREDENTIALS, LEGACY_CREDENTIALS].each do |creds|
       ENV['GOOGLE_APPLICATION_CREDENTIALS'] = creds[:path]
       d = create_driver
@@ -246,6 +272,17 @@ module BaseTest
       d.run
     end
     verify_log_entries(1, EC2_PARAMS)
+  end
+
+  def test_one_log_openstack
+    ENV['GOOGLE_APPLICATION_CREDENTIALS'] = IAM_CREDENTIALS[:path]
+    setup_openstack_metadata_stubs
+    setup_logging_stubs do
+      d = create_driver(CONFIG_OPENSTACK_PROJECT_ID)
+      d.emit('message' => log_entry(0))
+      d.run
+    end
+    verify_log_entries(1, OPENSTACK_PARAMS)
   end
 
   def test_structured_payload_log
@@ -1319,6 +1356,17 @@ module BaseTest
                  'instance-identity/document')
       .to_return(body: EC2_IDENTITY_DOCUMENT, status: 200,
                  headers: { 'Content-Length' => EC2_IDENTITY_DOCUMENT.length })
+  end
+
+  def setup_openstack_metadata_stubs
+    stub_request(:get, 'http://169.254.169.254')
+      .to_return(status: 200, headers: {})
+    stub_request(:get, 'http://169.254.169.254/openstack')
+      .to_return(status: 200, headers: {}, body: "2012-08-10\n2013-04-04\n2013-10-17")
+
+    stub_metadata_request('latest/meta-data/placement/availability-zone', OPENSTACK_ZONE)
+    stub_metadata_request('latest/meta-data/instance-id', OPENSTACK_VM_ID)
+    stub_metadata_request('latest/meta-data/hostname', OPENSTACK_HOSTNAME)
   end
 
   def setup_auth_stubs

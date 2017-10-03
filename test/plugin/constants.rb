@@ -46,6 +46,13 @@ module Constants
   EC2_VM_ID = 'i-81c16767'
   EC2_ACCOUNT_ID = '123456789012'
 
+  # Attributes used for the OpenStack metadata service.
+  OPENSTACK_PROJECT_ID = 'test-openstack-project-id'
+  OPENSTACK_ZONE = 'nova'
+  OPENSTACK_PREFIXED_ZONE = 'openstack:' + OPENSTACK_ZONE
+  OPENSTACK_VM_ID = 'i-0000776d'
+  OPENSTACK_HOSTNAME = 'openstack.hostname.org'
+
   # The formatting here matches the format used on the VM.
   EC2_IDENTITY_DOCUMENT = %({
     "accountId" : "#{EC2_ACCOUNT_ID}",
@@ -208,6 +215,13 @@ module Constants
   CONFIG_EC2_PROJECT_ID_AND_CUSTOM_VM_ID = %(
     project_id #{EC2_PROJECT_ID}
     vm_id #{CUSTOM_VM_ID}
+  )
+
+  CONFIG_OPENSTACK_PROJECT_ID = %(
+    project_id #{OPENSTACK_PROJECT_ID}
+    vm_id #{OPENSTACK_VM_ID}
+    zone #{OPENSTACK_ZONE}
+    vm_name #{OPENSTACK_HOSTNAME}
   )
 
   CONFIG_DATAFLOW = %(
@@ -505,6 +519,21 @@ module Constants
     project_id: EC2_PROJECT_ID,
     labels: {
       "#{EC2_CONSTANTS[:service]}/resource_name" => HOSTNAME
+    }
+  }
+
+  OPENSTACK_PARAMS = {
+    resource: {
+      type: OPENSTACK_CONSTANTS[:resource_type],
+      labels: {
+        'instance_id' => OPENSTACK_VM_ID,
+        'region' => OPENSTACK_ZONE
+      }
+    },
+    log_name: 'test',
+    project_id: OPENSTACK_PROJECT_ID,
+    labels: {
+      "#{OPENSTACK_CONSTANTS[:service]}/resource_name" => HOSTNAME
     }
   }
 

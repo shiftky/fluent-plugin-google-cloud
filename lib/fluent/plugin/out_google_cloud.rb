@@ -78,6 +78,10 @@ module Fluent
         service: 'ec2.amazonaws.com',
         resource_type: 'aws_ec2_instance'
       }
+      OPENSTACK_CONSTANTS = {
+        service: 'openstack.org',
+        resource_type: 'openstack_instance'
+      }
       ML_CONSTANTS = {
         service: 'ml.googleapis.com',
         resource_type: 'ml_job',
