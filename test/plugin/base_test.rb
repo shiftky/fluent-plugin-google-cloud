@@ -1361,12 +1361,18 @@ module BaseTest
   def setup_openstack_metadata_stubs
     stub_request(:get, 'http://169.254.169.254')
       .to_return(status: 200, headers: {})
-    stub_request(:get, 'http://169.254.169.254/openstack')
-      .to_return(status: 200, headers: {}, body: "2012-08-10\n2013-04-04\n2013-10-17")
 
-    stub_metadata_request('latest/meta-data/placement/availability-zone', OPENSTACK_ZONE)
-    stub_metadata_request('latest/meta-data/instance-id', OPENSTACK_VM_ID)
-    stub_metadata_request('latest/meta-data/hostname', OPENSTACK_HOSTNAME)
+    stub_request(:get, 'http://169.254.169.254/openstack')
+      .to_return(body: "2012-08-10\n2013-04-04\n2013-10-17", status: 200, headers: {})
+
+    stub_request(:get, 'http://169.254.169.254/latest/meta-data/placement/availability-zone')
+      .to_return(body: OPENSTACK_ZONE, status: 200)
+
+    stub_request(:get, 'http://169.254.169.254/latest/meta-data/instance-id')
+      .to_return(body: OPENSTACK_VM_ID, status: 200)
+
+    stub_request(:get, 'http://169.254.169.254/latest/meta-data/hostname')
+      .to_return(body: OPENSTACK_HOSTNAME, status: 200)
   end
 
   def setup_auth_stubs
