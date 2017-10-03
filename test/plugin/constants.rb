@@ -221,7 +221,6 @@ module Constants
     project_id #{OPENSTACK_PROJECT_ID}
     vm_id #{OPENSTACK_VM_ID}
     zone #{OPENSTACK_ZONE}
-    vm_name #{OPENSTACK_HOSTNAME}
   )
 
   CONFIG_DATAFLOW = %(

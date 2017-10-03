@@ -79,8 +79,8 @@ module Fluent
         resource_type: 'aws_ec2_instance'
       }
       OPENSTACK_CONSTANTS = {
-        service: 'openstack.org',
-        resource_type: 'openstack_instance'
+        service: 'compute.googleapis.com',
+        resource_type: 'gce_instance'
       }
       ML_CONSTANTS = {
         service: 'ml.googleapis.com',
@@ -703,9 +703,10 @@ module Fluent
 
     # "enum" of Platform values
     module Platform
-      OTHER = 0  # Other/unkown platform
-      GCE = 1    # Google Compute Engine
-      EC2 = 2    # Amazon EC2
+      OTHER = 0     # Other/unkown platform
+      GCE = 1       # Google Compute Engine
+      EC2 = 2       # Amazon EC2
+      OPENSTACK = 3 # OpenStack
     end
 
     # Determine what platform we are running on by consulting the metadata
@@ -729,6 +730,17 @@ module Fluent
         end
       rescue StandardError => e
         @log.error 'Failed to access metadata service: ', error: e
+      end
+
+      begin
+        open('http://' + METADATA_SERVICE_ADDR + '/openstack') do |f|
+          if f.status[0] == '200'
+            @log.info 'Detected OpenStack platform'
+            return Platform::OPENSTACK
+          end
+        end
+      rescue StandardError => e
+        @log.error 'Failed to access OpenStack metadata service: ', error: e
       end
 
       @log.info 'Unable to determine platform'
@@ -758,6 +770,20 @@ module Fluent
       end
 
       @ec2_metadata
+    end
+
+    def openstack_metadata
+      fail "Called openstack_metadata with platform=#{@platform}" unless
+        @platform == Platform::OPENSTACK
+
+      @openstack_metadata = {
+        'instance-id' =>
+          open('http://' + METADATA_SERVICE_ADDR + '/latest/meta-data/instance-id', &:read),
+        'availability-zone' =>
+          open('http://' + METADATA_SERVICE_ADDR + '/latest/meta-data/placement/availability-zone', &:read)
+      }
+
+      @openstack_metadata
     end
 
     # Set regexp patterns to parse tags and logs.
@@ -810,6 +836,7 @@ module Fluent
     def set_vm_id
       @vm_id ||= fetch_gce_metadata('instance/id') if @platform == Platform::GCE
       @vm_id ||= ec2_metadata['instanceId'] if @platform == Platform::EC2
+      @vm_id ||= openstack_metadata['instance-id'] if @platform == Platform::OPENSTACK
     rescue StandardError => e
       @log.error 'Failed to obtain vm_id: ', error: e
     end
@@ -830,6 +857,8 @@ module Fluent
         @platform == Platform::GCE
       @zone ||= 'aws:' + ec2_metadata['availabilityZone'] if
         @platform == Platform::EC2 && ec2_metadata.key?('availabilityZone')
+      @zone ||= 'openstack:' + openstack_metadata['availability-zone'] if
+        @platform == Platform::OPENSTACK && openstack_metadata.key?('availability-zone')
     rescue StandardError => e
       @log.error 'Failed to obtain location: ', error: e
     end
@@ -854,6 +883,9 @@ module Fluent
       when Platform::OTHER
         # Unknown platform will be defaulted to GCE instance.
         return COMPUTE_CONSTANTS[:resource_type]
+
+      when Platform::OPENSTACK
+        return OPENSTACK_CONSTANTS[:resource_type]
 
       when Platform::EC2
         return EC2_CONSTANTS[:resource_type]
@@ -929,6 +961,13 @@ module Fluent
         labels['aws_account'] = ec2_metadata['accountId'] if
           ec2_metadata.key?('accountId')
         return labels
+
+      # OpenStack.
+      when OPENSTACK_CONSTANTS[:resource_type]
+        return {
+          'instance_id' => @vm_id,
+          'region' => @zone
+        }
       end
 
       {}
@@ -967,7 +1006,13 @@ module Fluent
       when EC2_CONSTANTS[:resource_type]
         labels.merge!(
           "#{EC2_CONSTANTS[:service]}/resource_name" => @vm_name)
+
+      # OpenStack.
+      when OPENSTACK_CONSTANTS[:resource_type]
+        labels.merge!(
+          "#{OPENSTACK_CONSTANTS[:service]}/resource_name" => @vm_name)
       end
+
       labels
     end
 
