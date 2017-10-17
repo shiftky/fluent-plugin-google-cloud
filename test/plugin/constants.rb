@@ -526,7 +526,7 @@ module Constants
       type: OPENSTACK_CONSTANTS[:resource_type],
       labels: {
         'instance_id' => OPENSTACK_VM_ID,
-        'region' => OPENSTACK_ZONE
+        'zone' => OPENSTACK_ZONE
       }
     },
     log_name: 'test',
